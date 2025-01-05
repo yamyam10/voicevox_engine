@@ -1,0 +1,83 @@
+name: test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-latest, windows-latest]
+
+    steps:
+      - name: <Setup> Check out the repository
+        uses: actions/checkout@v4
+
+      - name: <Setup> Prepare Python Runtime / Python Dependencies
+        uses: ./.github/actions/prepare_python
+        with:
+          requirements-suffix: "-dev"
+
+      - name: <Test> Validate poetry.lock
+        run: |
+          poetry lock --no-update
+          git diff --exit-code
+
+      - name: <Test> Check dependency lists
+        run: |
+          poetry export --without-hashes -o requirements.txt.check
+          poetry export --without-hashes --with dev -o requirements-dev.txt.check
+          poetry export --without-hashes --with build -o requirements-build.txt.check
+
+          diff -q requirements.txt requirements.txt.check || \
+          diff -q requirements-dev.txt requirements-dev.txt.check || \
+          diff -q requirements-build.txt requirements-build.txt.check > /dev/null
+          if [ $? = 1 ]; then
+            echo "poetry export has some diff"
+            exit 1
+          fi
+
+      - name: <Test> Check format
+        run: pysen run lint
+
+      - name: <Test> Test codes and coverage
+        run: coverage run --omit=test/* -m pytest
+
+      - name: <Deploy> Submit coverage results to Coveralls
+        if: matrix.os == 'ubuntu-20.04'
+        run: coveralls --service=github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: <Test> Check licenses
+        run: OUTPUT_LICENSE_JSON_PATH=/dev/null bash tools/create_venv_and_generate_licenses.bash
+
+      - name: <Test> Test names by checking typo
+        if: matrix.os == 'ubuntu-20.04'
+        uses: crate-ci/typos@v1.21.0
+
+  lint-builders:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: <Setup> Check out the repository
+        uses: actions/checkout@v4
+
+      - name: <Setup> Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: <Test> Check shell files
+        run: git ls-files | grep -E '\.(ba)?sh' | xargs shellcheck
+
+      - name: <Test> Check workflow files
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint
