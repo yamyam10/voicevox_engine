@@ -174,7 +174,7 @@ def read_cli_arguments(envs: Envs) -> CLIArgs:
         "--port", type=int, default=50021, help="接続を受け付けるポート番号です。"
     )
     parser.add_argument(
-        "--use_gpu", action="store_true", help="GPUを使って音声合成するようになります。"
+        '--gpu', action='store_false', default=False, help="GPUを無効にする"
     )
     parser.add_argument(
         "--voicevox_dir",
