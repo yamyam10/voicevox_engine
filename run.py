@@ -406,6 +406,10 @@ def main() -> None:
     )
 
     # VOICEVOX ENGINE サーバーを起動
+
+    # サーバーが起動した後にURLを表示
+    print(f"VOICEVOX ENGINE is running at http://{args.host}:{args.port}")
+    
     # NOTE: デフォルトは ASGI に準拠した HTTP/1.1 サーバー
     uvicorn.run(app, host=args.host, port=args.port)
 
